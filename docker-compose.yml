@@ -1,0 +1,87 @@
+version: '3'
+
+services:
+    postgresDB13:
+        image: postgres:13
+        container_name: postgresDB13
+        restart: always
+        ports:
+            - "5433:5432"
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=postgres
+    
+    zookeeper:
+        image: debezium/zookeeper:2.4.2.Final
+        container_name: zookeeper_debe
+        restart: always
+        ports:
+            - "2181:2181"
+
+    kafka:
+        image: debezium/kafka:2.4.2.Final
+        depends_on:
+            - zookeeper
+        container_name: kafka_debe
+        restart: always
+        ports:
+             - "9092:9092"
+             - "9991:9991"
+        environment:
+             - ZOOKEEPER_CONNECT=zookeeper:2181
+            
+    debezium:
+        image: debezium/connect:2.4.2.Final
+        container_name: debeziumDebe
+        depends_on:
+            - kafka
+            - postgresDB13
+        restart: always
+        ports:
+            - "8083:8083"
+        environment:
+            - ZOOKEEPER_CONNECT=zookeeper:2181
+            # - BOOTSTRAP_SERVERS=kafka:9092
+            # - GROUP_ID=1
+            # - CONFIG_STORAGE_TOPIC=connect_configs
+            # - OFFSET_STORAGE_TOPIC=connect_offsets
+            # - STATUS_STORAGE_TOPIC=connect_statuses
+            # - ENABLE_DEBEZIUM_KC_REST_EXTENSION=true
+            # - ENABLE_DEBEZIUM_SCRIPTING=true
+            # - CONNECT_REST_EXTENSION_CLASSES=io.debezium.kcrestextension.DebeziumConnectRestExtension
+            
+    #Servicios de Visualizacion
+    kafka-ui:
+        image: provectuslabs/kafka-ui:53a6553765a806eda9905c43bfcfe09da6812035
+        depends_on:
+            - kafka
+        container_name: kafka_ui
+        restart: always
+        ports:
+            - "8080:8080"
+        environment:
+            DYNAMIC_CONFIG_ENABLED: 'true'
+            KAFKA_CLUSTERS_0_NAME: local
+            KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:9092
+            KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+    kafdrop:
+        image: obsidiandynamics/kafdrop
+        restart: always
+        environment:
+            KAFKA_BROKERCONNECT: "kafka:9092"
+        ports:
+            - 9001:9000
+        depends_on:
+            - kafka
+
+    debezium-ui:
+        image: debezium/debezium-ui:2.4
+        depends_on:
+            - debezium
+        container_name: debezium_ui
+        restart: always
+        ports:
+            - "8081:8080"
+        environment:
+            - KAFKA_CONNECT_URIS=http://debezium:8083
